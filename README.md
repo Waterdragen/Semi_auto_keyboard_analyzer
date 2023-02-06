@@ -111,7 +111,7 @@ Copy this section to advance to the next generation.
 
 The console will print the time elapsed when the program is done.
 
-# Documentations (analyzer.py)
+# Documentations (hash_table_writer.py)
 
 You only need to edit statements inside `if __name__ == '__main__':` to make the program work.
 
@@ -119,6 +119,7 @@ You only need to edit statements inside `if __name__ == '__main__':` to make the
 
 | Function Name | Parameter(s) Type | Description |
 | ------------- | ----------------- | ----------- |
-| `keyboard_effort_table()`| None | Write a .json file of a effort table based on Colemak-DH's effort model. |
-| `make_hash_tables` | generation number: `int` | Writes 3 .json files: Row occurrence counter hash table, Row occurrence difference counter hash table, Letter's column occurrence hash table |
-| `best_keyboard` | generation number: `int` | Prints the best keyboards of the generation to the console. |
+| `keyboard_effort_table()`| `None` | Write a .json file of a effort table based on Colemak-DH's effort model. |
+| `make_hash_tables()` | generation number: `int` | Writes 3 .json files: Row occurrence counter hash table, Row occurrence difference counter hash table, Letter's column occurrence hash table |
+| `best_keyboard()` | generation number: `int` | Prints the best keyboards of the generation to the console. |
+| `row_col_intersection()` | GenRow: `dict[str, int]`, GenCol: `dict[str, Union[int, tuple[int, ...]]]` | Finds and prints all possible key positions constraints based on the given row and columns. There can only be 1 fixed row but can have multiple columns. |
