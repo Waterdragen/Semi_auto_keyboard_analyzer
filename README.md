@@ -5,17 +5,17 @@ this analyzer ignores punctuation n-grams. The empty keys are represented as '-'
 # Documentations (analyzer.cpp)
 
 ### Reminder: You only need to understand `get_stats()`, `write_stats()`, `gen1()` and `main()` to make the program work. You can skip this part.
-Added as a proof of progress.
+Added as proof of progress.
 
 ### Keyboard (class object)
-stores a keyboard with given layout string. The class methods initialize the keyboard and computes the statistics of the keyboard.
+stores a keyboard with a given layout string. The class methods initialize the keyboard and compute the statistics of the keyboard.
 
 ### Keyboard.class_variables
 
 | Variable Name | Variable Type | Description |
 | ------------- | ------------- | ----------- |
 | `Keyboard.KeyboardLayout` | `string` (`.length() == 30`) | String representation of the `Keyboard`. For example: `"qwfpbjluy;arstgmneiozxcdvkh,./"` represents a Colemak-DH keyboard, where the keys start from left-to-right, top-to-bottom order |
-| `Keyboard.KeyboardMap` | `short[30][2]` | An array which stores the locations of the keys of the `Keyboard`. The first 26 items store the (row, column) of the corresponding letter where `'a' == 0`, ... , `'z' == 25`. The last 4 itmes are placeholders and they are not used. |
+| `Keyboard.KeyboardMap` | `short[30][2]` | An array that stores the locations of the keys of the `Keyboard`. The first 26 items store the (row, column) of the corresponding letter where `'a' == 0`, ... , `'z' == 25`. The last 4 items are placeholders and they are not used. |
 | `Keyboard.effort` | `double` | The typing effort of the `Keyboard`. It is calculated based on Colemak-DH's typing effort model. However, the typing effort model is scaled down so that the average typing effort is `1.0`. This is done so that a randomly generated Keyboard will have a typing effort of `100.0` |
 | `Keyboard.hand_diff` | `double` | The typing effort difference of the Left Hand and the Right Hand. |
 | `Keyboard.sfb` | `double` | Stands for Same Finger Bigram. Bigrams typed using the same Fingers. |
@@ -25,8 +25,8 @@ stores a keyboard with given layout string. The class methods initialize the key
 | `Keyboard.total_twists` | `double` | The sum of InTwists and OutTwists. |
 | `Keyboard.outtwist_ratio` | `double` | The ratio of OutTwists to Total Twists. |
 | `Keyboard.alternate` | `double` | Trigrams typed with one hand, then one with the other, then back to the first. |
-| `Keyboard.inroll` | `double` | Trigrams where two (not same finger) keys typed with one hand, and a third key with the other, and goes from outer columns to inner columns. |
-| `Keyboard.outroll` | `double` | Trigrams where two (not same finger) keys typed with one hand, and a third key with the other, and goes from inner columns to outer columns. |
+| `Keyboard.inroll` | `double` | Trigrams where two (not same finger) keys are typed with one hand, and a third key with the other, and goes from outer columns to inner columns. |
+| `Keyboard.outroll` | `double` | Trigrams where two (not same finger) keys are typed with one hand, and a third key with the other, and goes from inner columns to outer columns. |
 | `Keyboard.total_rolls` | `double` | The sum of InRolls and OutRolls. |
 | `Keyboard.inroll_ratio` | `double` | The ratio of InRolls to Total Rolls. |
 | `Keyboard.onehand` | `double` | One-handed Trigrams where all keys go in the same direction. |
@@ -49,15 +49,16 @@ stores a keyboard with given layout string. The class methods initialize the key
 | ------------- | ------------- | ----------- |
 | `print_percentile()` | `ofstream`, `vector<double>`, `int`, `string` | Gets the percentile of the stats. Writes them to a text file and prints them to the console. |
 | `add_to_arrays()` | `vector<double>`, ... , `Keyboard`, `int` | Adds the `Keyboard.class_variables` to the corresponding `vector<double>` |
-| `write_to_file()` | `ofstream`, `string`, `Keyboard` | Writes the `Keyboard` stats to text file. |
+| `write_to_file()` | `ofstream`, `string`, `Keyboard` | Writes the `Keyboard` stats to a text file. |
 | `fullfilled_all_thres()` | `Keyboard`, `vector<double>` | Check if the `Keyboard` has fulfilled all the thresholds.  |
 
 ## Main functions
 | Function Name | Parameter(s) Type | Description |
 | ------------- | ----------------- | ----------- |
-| **`get_stats()`** | iterations: `int`, func: `void(...)` (should be similiar to gen1), gen_num: `int` | Gets (a small number, like `1000`) `Keyboard` stats samples using the random `Keyboard` generator like `gen1()`. Writes the percentiles to a text file and prints to console. You can use the percentiles to set the thresholds. The generation number should match the number of the function, to rename the file using that number. |
-| **`write_stats()`** | iterations: `int`, func: `void()` (should be similiar to gen1), gen_num: `int`, thresholds: `vector<double` | Gets (a large number, like `5'000'000`) `Keyboard` stats using the random `Keyboard` generator like `gen1()`. Writes the stats that fulfilled all the thresholds to a text file. It takes around 4.2 minutes to compute `1'000'000` keyboard layouts. |
+| **`get_stats()`** | iterations: `int`, func: `void(...)` (should be similar to gen1), gen_num: `int` | Gets (a small number, like `1000`) `Keyboard` stats samples using the random `Keyboard` generator like `gen1()`. Writes the percentiles to a text file and prints to the console. You can use the percentiles to set the thresholds. The generation number should match the number of the function, to rename the file using that number. |
+| **`write_stats()`** | iterations: `int`, func: `void()` (should be similar to gen1), gen_num: `int`, thresholds: `vector<double` | Gets (a large number, like `5'000'000`) `Keyboard` stats using the random `Keyboard` generator like `gen1()`. Writes the stats that fulfilled all the thresholds to a text file. It takes around 4.2 minutes to compute `1'000'000` keyboard layouts. |
 | **`gen1()`** | iterations: `int`, `vector<double>`, ... , is_get_stats: `bool`, kb_file: `ofstream`, thresholds: `vector<double>` | You may need to edit and/or copy this function but you don't have to change the parameters. Randomly generates `Keyboard` for <`iterations`> times. See below for more details. |
+
 | **`main()`** | `void` | You may need to edit this function. get the percentile of the stats / write the stats to a text file. See below for more details. |
 
 ### gen1() (or other names)
@@ -72,14 +73,14 @@ Example: `string keyboard_str = "______________________________";`  <br>
 Example: `e_loc[4] = { 16, 17, 18, 19 };  <br>
 This means e has 4 possible locations: 16, 17, 18, or 19.  <br>
 
-You can make multiple constraints but make sure that none of them are *busted*  <br>
+You can make multiple constraints but make sure that none of them is *busted*  <br>
 Bad example:  <br>
 ```
 a_loc[2] = [17, 18]
 e_loc[2] = [17, 18]
 o_loc[2] = [17, 18]
 ```
-The a and e has to fill 17 and 18, leaving o nowhere to place it and you'll get stuck in a loop.  <br>
+The a and e have to fill 17 and 18, leaving o nowhere to place them and you'll get stuck in a loop.  <br>
 
 make sure you do not remove this line: `string filled_kb_text = keyboard_str;`  <br>
 this makes a copy of the original string `keyboard_str`  <br>
@@ -106,7 +107,7 @@ Do not change the remaining code.
 							30.0939, 38.5164, 0.512739, 2.70094, 9.14206 };
 	// write_stats(write_iterations, gen1, 1, thres1);
 ```
-Either get the stats's percentile of gen1, or write the stats to the text file, depending the line you uncomment.
+Either get the stats percentile of gen1, or write the stats to the text file, depending on the line you uncomment.
 Copy this section to advance to the next generation.
 
 The console will print the time elapsed when the program is done.
