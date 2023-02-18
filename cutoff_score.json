@@ -1,0 +1,13 @@
+{
+	"effort": 0.4,
+	"hand_diff": 0.3,
+	"sfb": 0.1,
+	"lsb": 0.35,
+	"total_twists": 0.5,
+	"outtwist_ratio": 0.5,
+	"alternate": 0.2,
+	"total_rolls": 0.6,
+	"inroll_ratio": 0.6,
+	"onehand": 0.55,
+	"redirect": 0.5
+}
