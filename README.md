@@ -1,6 +1,6 @@
 # Semi-auto Keyboard Analyzer
 
-# Documentations (analyzer.cpp)
+## Documentations (analyzer.cpp)
 
 You will use 2 json files to generate the keyboard layouts
 
@@ -24,7 +24,7 @@ After editing the .json files, you can run the program
 
 The console will print the time elapsed when the program is done.
 
-# Documentations (hash_table_writer.py)
+## Documentations (hash_table_writer.py)
 
 You only need to edit statements inside `if __name__ == '__main__':` to make the program work.
 
