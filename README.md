@@ -20,6 +20,8 @@ gets anything **below** percentile of the keys  <br>
 for example: `0.3` means only keep the best 30% in this criterion  <br>
 the keyboard layout has to fulfill all the thresholds  <br>
 
+After editing the .json files, you can run the program
+
 The console will print the time elapsed when the program is done.
 
 # Documentations (hash_table_writer.py)
