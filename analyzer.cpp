@@ -13,15 +13,34 @@
 
 using namespace std;
 using json = nlohmann::json;
+using ordered_json = nlohmann::ordered_json;
 
-ifstream effortTableJson("keyboard_effort_table.json");
+typedef chrono::high_resolution_clock Time;
+typedef chrono::milliseconds ms;
+typedef chrono::microseconds us;
+typedef chrono::duration<float> fsec;
+
+ifstream infile_if_file_exists(string filepath) {
+	ifstream infile_object;
+	infile_object.open(filepath);
+	if (!infile_object)
+		throw std::runtime_error("FileNotFoundError in infile_if_file_exists()");
+	return infile_object;
+}
+
+ifstream effortTableJson = infile_if_file_exists("keyboard_effort_table.json");
 json EffortTable = json::parse(effortTableJson);
-ifstream monogramJson("n1gram_frequency.json");
+ifstream monogramJson = infile_if_file_exists("C:/Users/yezhi/Desktop/COMP 1011/machine learning/keyboard_analyzer/KeyboardAnalyzerSolution/x64/Release/n1gram_frequency.json");
 json Monogram = json::parse(monogramJson);
-ifstream bigramJson("n2gram_frequency.json");
+ifstream bigramJson = infile_if_file_exists("n2gram_frequency.json");
 json Bigram = json::parse(bigramJson);
-ifstream trigramJson("n3gram_frequency.json");
+ifstream trigramJson = infile_if_file_exists("n3gram_frequency.json");
 json Trigram = json::parse(trigramJson);
+ifstream constraintsJson = infile_if_file_exists("config.json");
+ordered_json Constraints = ordered_json::parse(constraintsJson);
+ifstream cutoffScoreJson = infile_if_file_exists("cutoff_score.json");
+json CutoffScore = json::parse(cutoffScoreJson);
+
 
 class Keyboard {
 public:
@@ -49,21 +68,13 @@ public:
 
 	void make_keyboard(string& keys) {
 		if (keys.length() != 30) {
-			std::cout << "Expected 30 char for keys, got " << keys.length();
-			std::cin.get();
+			throw runtime_error("Expected 30 char for keys");
 			exit(1);
 		}
 		this->KeyboardLayout = keys;
 		for (int i = 0; i < 30; i++) {
-			if (this->KeyboardLayout[i] < 97 || this->KeyboardLayout[i] > 123) {
-				continue;
-			}
-			this->KeyboardMap[KeyboardLayout[i] - 97][0] = i / 10;
-			this->KeyboardMap[KeyboardLayout[i] - 97][1] = i % 10;
-		}
-		for (int i = 26; i < 30; i++) {
-			this->KeyboardMap[i][0] = -1;
-			this->KeyboardMap[i][1] = -1;
+			this->KeyboardMap[to_keyboard_loc(KeyboardLayout[i])][0] = i / 10;
+			this->KeyboardMap[to_keyboard_loc(KeyboardLayout[i])][1] = i % 10;
 		}
 	}
 
@@ -155,23 +166,37 @@ public:
 			<< "Redirects: " << this->redirect << '\n';
 	}
 
+	short to_keyboard_loc(char key) {
+		if (97 <= key && key < 123)
+			return key - 97;
+		switch (key) {
+		case ';':
+			return 26;
+		case ',':
+			return 27;
+		case '.':
+			return 28;
+		case '\'':
+			return 29;
+		}
+	}
+
 	/*
 	Gets the total typing effort of the whole keyboard and for individual fingers
 	*/
 	void get_monogram_stats() {
 		double letter_freq;
 		double letter_effort;
-
+		
 		for (int i = 0; i < 30; i++) {
-			if (this->KeyboardLayout[i] < 97 || this->KeyboardLayout[i] > 123) {
-				continue;
-			}
 			string key = "";
 			key += this->KeyboardLayout[i];
 			letter_freq = Monogram[key];
+			
 			letter_effort = EffortTable["key" + to_string(i)];
 			this->effort += letter_freq * letter_effort;
-			short col0 = this->KeyboardMap[KeyboardLayout[i] - 97][1];
+			short col0;
+			col0 = this->KeyboardMap[to_keyboard_loc(this->KeyboardLayout[i])][1];
 			// Left hand [0] is col 0~4, Right hand [1] is col 5~9
 			this->hand_usage[col0 >= 5] += (double)letter_freq;
 		}
@@ -188,10 +213,10 @@ public:
 		short valid_cols[4] = { 2, 1, 3, 0 };
 
 		for (auto& bigram : Bigram.items()) {
-			short row0 = this->KeyboardMap[(int)bigram.key()[0] - 97][0];
-			short col0 = this->KeyboardMap[(int)bigram.key()[0] - 97][1];
-			short row1 = this->KeyboardMap[(int)bigram.key()[1] - 97][0];
-			short col1 = this->KeyboardMap[(int)bigram.key()[1] - 97][1];
+			short row0 = this->KeyboardMap[to_keyboard_loc(bigram.key()[0])][0];
+			short col0 = this->KeyboardMap[to_keyboard_loc(bigram.key()[0])][1];
+			short row1 = this->KeyboardMap[to_keyboard_loc(bigram.key()[1])][0];
+			short col1 = this->KeyboardMap[to_keyboard_loc(bigram.key()[1])][1];
 			bool is_sfb = false;
 
 			// Sfb: If same col or cols combination is 3,4 or 5,6, exclude same key
@@ -264,12 +289,12 @@ public:
 	*/
 	void get_trigram_stats() {
 		for (auto& trigram : Trigram.items()) {
-			short row0 = this->KeyboardMap[trigram.key()[0] - 97][0];
-			short col0 = this->KeyboardMap[trigram.key()[0] - 97][1];
-			short row1 = this->KeyboardMap[trigram.key()[1] - 97][0];
-			short col1 = this->KeyboardMap[trigram.key()[1] - 97][1];
-			short row2 = this->KeyboardMap[trigram.key()[2] - 97][0];
-			short col2 = this->KeyboardMap[trigram.key()[2] - 97][1];
+			short row0 = this->KeyboardMap[to_keyboard_loc(trigram.key()[0])][0];
+			short col0 = this->KeyboardMap[to_keyboard_loc(trigram.key()[0])][1];
+			short row1 = this->KeyboardMap[to_keyboard_loc(trigram.key()[1])][0];
+			short col1 = this->KeyboardMap[to_keyboard_loc(trigram.key()[1])][1];
+			short row2 = this->KeyboardMap[to_keyboard_loc(trigram.key()[2])][0];
+			short col2 = this->KeyboardMap[to_keyboard_loc(trigram.key()[2])][1];
 			short hand0 = col0 / 5;
 			short hand1 = col1 / 5;
 			short hand2 = col2 / 5;
@@ -329,127 +354,6 @@ public:
 	}
 };
 
-struct kbStats {
-	string layout;
-	double score;
-};
-
-void print_percentile(ofstream& file, vector<double>& sorted_data, int& data_len, string& category) {
-	// Write to stats file
-	file << category << ':' << endl;
-	file << "\tTop 1%: " << sorted_data[(int)(data_len * 0.99)] << endl;
-	for (int i = 10; i < 50; i += 10) {
-		file << "\tTop " << to_string(i) << "% : " <<
-			sorted_data[(int)(data_len * (1 - (double)i / (double)100.0))] << endl;
-	}
-	file << "\tMedian: " << sorted_data[(int)(data_len * 0.5)] << endl;
-	for (int i = 60; i < 100; i += 10) {
-		file << "\tBottom " << to_string(100 - i) << "% : " <<
-			sorted_data[(int)(data_len * (1 - (double)i / (double)100.0))] << endl;
-	}
-	file << "\tBottom 1%: " << sorted_data[(int)(data_len * 0.01)] << endl;
-
-	// Print to console, same
-	std::cout << category << ':' << endl;
-	std::cout << "\tTop 1%: " << sorted_data[(int)(data_len * 0.99)] << endl;
-	for (int i = 10; i < 50; i += 10) {
-		std::cout << "\tTop " << to_string(i) << "% : " <<
-			sorted_data[(int)(data_len * (1 - (double)i / (double)100.0))] << endl;
-	}
-	std::cout << "\tMedian: " << sorted_data[(int)(data_len * 0.5)] << endl;
-	for (int i = 60; i < 100; i += 10) {
-		std::cout << "\tBottom " << to_string(100 - i) << "% : " <<
-			sorted_data[(int)(data_len * (1 - (double)i / (double)100.0))] << endl;
-	}
-	std::cout << "\tBottom 1%: " << sorted_data[(int)(data_len * 0.01)] << endl;
-}
-
-void get_stats(int iterations, void func(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
-		vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
-		vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
-		vector<double>& onehand_data, vector<double>& redirect_data,
-		bool is_get_stats, ofstream& kb_file, vector<double>& thresholds), short gen_num) {
-	// Monogram data
-	vector<double> effort_data(iterations);
-	vector<double> hand_diff_data(iterations);
-	// Bigram data
-	vector<double> sfb_data(iterations);
-	vector<double> lsb_data(iterations);
-	vector<double> total_twists_data(iterations);
-	vector<double> outtwist_ratio_data(iterations);
-	// Trigram data
-	vector<double> alternate_data(iterations);
-	vector<double> total_rolls_data(iterations);
-	vector<double> inroll_ratio_data(iterations);
-	vector<double> onehand_data(iterations);
-	vector<double> redirect_data(iterations);
-	// Output file
-	ofstream stats_file;
-	string stats_filepath = "gen" + to_string(gen_num) + "_stats.txt";
-	stats_file.open(stats_filepath);
-	// Not used: Placeholders
-	ofstream write_file;
-	vector<double> thresholds;
-
-	// call gen{n}()
-	func(iterations, effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-		alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, true, write_file, thresholds);
-	
-	sort(effort_data.begin(), effort_data.end());
-	sort(hand_diff_data.begin(), hand_diff_data.end());
-	sort(sfb_data.begin(), sfb_data.end());
-	sort(lsb_data.begin(), lsb_data.end());
-	sort(total_twists_data.begin(), total_twists_data.end());
-	sort(outtwist_ratio_data.begin(), outtwist_ratio_data.end());
-	sort(alternate_data.begin(), alternate_data.end());
-	sort(total_rolls_data.begin(), total_rolls_data.end());
-	sort(inroll_ratio_data.begin(), inroll_ratio_data.end());
-	sort(onehand_data.begin(), onehand_data.end());
-	sort(redirect_data.begin(), redirect_data.end());
-
-	// '<' means the less the better, '>' means the more the better
-	string effort_text = "Effort < ";
-	string hand_diff_text = "HandDiff < ";
-	string sfb_text = "Sfb < ";
-	string lsb_text = "Lsb < ";
-	string total_twists_text = "TotalTwists < ";
-	string outtwist_ratio_text = "OuttwistRatio < ";
-	string alternate_text = "Alternates > ";
-	string total_rolls_text = "TotalRolls > ";
-	string inroll_ratio_text = "InrollRatio > ";
-	string onehand_text = "Onehand > ";
-	string redirect_text = "Redirect < ";
-
-	print_percentile(stats_file, effort_data, iterations, effort_text);
-	print_percentile(stats_file, hand_diff_data, iterations, hand_diff_text);
-	print_percentile(stats_file, sfb_data, iterations, sfb_text);
-	print_percentile(stats_file, lsb_data, iterations, lsb_text);
-	print_percentile(stats_file, total_twists_data, iterations, total_twists_text);
-	print_percentile(stats_file, outtwist_ratio_data, iterations, outtwist_ratio_text);
-	print_percentile(stats_file, alternate_data, iterations, alternate_text);
-	print_percentile(stats_file, total_rolls_data, iterations, total_rolls_text);
-	print_percentile(stats_file, inroll_ratio_data, iterations, inroll_ratio_text);
-	print_percentile(stats_file, onehand_data, iterations, onehand_text);
-	print_percentile(stats_file, redirect_data, iterations, redirect_text);
-}
-
-void write_stats(int iterations, void func(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
-	vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
-	vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
-	vector<double>& onehand_data, vector<double>& redirect_data,
-	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds), short gen_num, vector<double>& thresholds) {
-	// Output file
-	ofstream write_file;
-	string write_file_path = "gen" + to_string(gen_num) + ".txt";
-	write_file.open(write_file_path);
-	// Not used: Placeholders
-	vector<double> effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-		alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data;
-	// call gen{n}()
-	func(iterations, effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-		alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, false, write_file, thresholds);
-}
-
 void add_to_arrays(vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
 		vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
 		vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
@@ -493,88 +397,36 @@ bool fullfilled_all_thres(Keyboard& keyboard, vector<double>& thresholds) {
 			&& keyboard.redirect < thresholds[10]);
 }
 
-void gen1(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
-		vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
-		vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
-		vector<double>& onehand_data, vector<double>& redirect_data,
-		bool is_get_stats, ofstream& kb_file, vector<double>& thresholds) {
-	string remaining_str = "abcdfghijklmnopqrstuvwxyz----";
-	string keyboard_str = "______________________________";
-	short e_loc[4] = { 16, 17, 18, 19 };
-
-	// Set random seed to time
-	srand(time(0));
-	for (int i = 0; i < iterations; i++) {
-		string filled_kb_text = keyboard_str;
-
-		do { random_shuffle(e_loc, e_loc + 4); } while (filled_kb_text[e_loc[0]] != '_');
-		filled_kb_text[e_loc[0]] = 'e';
-
-		// Substitute remaining keys
-		short remaining_counter = 0;
-		random_shuffle(remaining_str.begin(), remaining_str.end());
-		for (int j = 0; j < 30; j++) {
-			if (filled_kb_text[j] == '_') {
-				filled_kb_text[j] = remaining_str[remaining_counter];
-				remaining_counter++;
-			}
-		}
-
-		// Get Keyboard stats
-		Keyboard keyboard;
-		keyboard.make_keyboard(filled_kb_text);
-		keyboard.get_stats();
-
-		// Add stats to the arrays if (is_get_stats)
-		if (is_get_stats) {
-			add_to_arrays(effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-				alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, keyboard, i);
-		}
-		// Write stats requires the output file, has to fulfill all thresholds
-		else {
-			if (fullfilled_all_thres(keyboard, thresholds)) { write_to_file(kb_file, filled_kb_text, keyboard); }
-		}
-	}
-}
-
-void gen2(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
+void auto_gen(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
 	vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
 	vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
 	vector<double>& onehand_data, vector<double>& redirect_data,
 	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds) {
-	string remaining_str = "bcdfgjklmpqsuvwxyz----";
-	string keyboard_str = "______________________________";
-	short e_loc[4] = { 16, 17, 18, 19 };
-	short a_loc[4] = { 10, 12, 17, 18 };
-	short i_loc[5] = { 11, 12, 16, 17, 18 };
-	string ot_str = "ot";
-	short ot_loc[10] = { 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 };
-	string nr_str = "nr";
-	short nr_loc[12] = { 0, 1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23 };
-	short h_loc[12] = { 0, 2, 3, 9, 10, 12, 13, 19, 20, 22, 23, 29 };
 
+	string remaining_str = Constraints["remaining"];
+	string keyboard_str = Constraints["keyboard"];
 
 	// Set random seed to time
 	srand(time(0));
+
 	for (int i = 0; i < iterations; i++) {
 		string filled_kb_text = keyboard_str;
 
-		do { random_shuffle(e_loc, e_loc + 4); } while (filled_kb_text[e_loc[0]] != '_');
-		filled_kb_text[e_loc[0]] = 'e';
-		do { random_shuffle(a_loc, a_loc + 4); } while (filled_kb_text[a_loc[0]] != '_');
-		filled_kb_text[a_loc[0]] = 'a';
-		do { random_shuffle(i_loc, i_loc + 5); } while (filled_kb_text[i_loc[0]] != '_');
-		filled_kb_text[i_loc[0]] = 'i';
-		for (int j = 0; j < ot_str.length(); j++) {
-			do { random_shuffle(ot_loc, ot_loc + 10); } while (filled_kb_text[ot_loc[0]] != '_');
-			filled_kb_text[ot_loc[0]] = ot_str[j];
+		// Shuffle list in json, if first item can fit in, add the char to the corresponding position
+		for (auto& constraints : Constraints["constraints"].items()) {
+			random_shuffle(constraints.value().begin(), constraints.value().end());
+			int j;
+			for (j = 0; j < constraints.value().size(); j++) {
+				if (filled_kb_text[constraints.value()[j]] == '_')
+					break;
+			}
+			char key = constraints.key()[0];
+			if (j == constraints.value().size()) {
+				cout << key;
+				throw runtime_error("Letter busted");
+			}
+			filled_kb_text[constraints.value()[j]] = constraints.key()[0];
 		}
-		for (int j = 0; j < nr_str.length(); j++) {
-			do { random_shuffle(nr_loc, nr_loc + 10); } while (filled_kb_text[nr_loc[0]] != '_');
-			filled_kb_text[nr_loc[0]] = nr_str[j];
-		}
-		do { random_shuffle(h_loc, h_loc + 12); } while (filled_kb_text[h_loc[0]] != '_');
-		filled_kb_text[h_loc[0]] = 'h';
 
 		// Substitute remaining keys
 		short remaining_counter = 0;
@@ -603,696 +455,86 @@ void gen2(int& iterations, vector<double>& effort_data, vector<double>& hand_dif
 	}
 }
 
-void gen3(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
+void auto_get_stats(void func(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
 	vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
 	vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
 	vector<double>& onehand_data, vector<double>& redirect_data,
-	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds) {
-	string remaining_str = "bcdfgjkpqsvwz----";
-	string keyboard_str = "______________________________";
-	short e_loc[4] = { 16, 17, 18, 19 };
-	string aoitn_str = "aoitn";
-	short aoitn_loc[8] = { 10, 11, 12, 13, 16, 17, 18, 19 };
-	short x_loc[10] = { 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 };
-	short h_loc[12] = { 0, 2, 3, 9, 10, 12, 13, 19, 20, 22, 23, 29 };
-	short r_loc[12] = { 0, 1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23 };
-	short l_loc[12] = { 0, 2, 3, 4, 10, 12, 13, 14, 20, 22, 23, 24 };
-	short y_loc[12] = { 5, 6, 7, 8, 15, 16, 17, 18, 25, 26, 27, 28 };
-	short u_loc[12] = { 5, 7, 8, 9, 15, 17, 18, 19, 25, 27, 28, 29 };
-	short m_loc[12] = { 0, 1, 3, 4, 10, 11, 13, 14, 20, 21, 23, 24 };
+	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds)) {
 
+	int iterations = Constraints["iterations"];
+	int stats_iterations = 1'000;  // Sampling size for thresholds
+	// Monogram data
+	vector<double> effort_data(stats_iterations);
+	vector<double> hand_diff_data(stats_iterations);
+	// Bigram data
+	vector<double> sfb_data(stats_iterations);
+	vector<double> lsb_data(stats_iterations);
+	vector<double> total_twists_data(stats_iterations);
+	vector<double> outtwist_ratio_data(stats_iterations);
+	// Trigram data
+	vector<double> alternate_data(stats_iterations);
+	vector<double> total_rolls_data(stats_iterations);
+	vector<double> inroll_ratio_data(stats_iterations);
+	vector<double> onehand_data(stats_iterations);
+	vector<double> redirect_data(stats_iterations);
+	// Output file
+	ofstream write_file;
+	string write_filepath = "gen" + to_string(Constraints["generation"]) + ".txt";
+	write_file.open(write_filepath);
+	vector<double> thresholds(11);
 
-	// Set random seed to time
-	srand(time(0));
-	for (int i = 0; i < iterations; i++) {
-		string filled_kb_text = keyboard_str;
+	// get the first 1000 stats -> add to arrays
+	func(stats_iterations, effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
+		alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, true, write_file, thresholds);
 
-		do { random_shuffle(e_loc, e_loc + 4); } while (filled_kb_text[e_loc[0]] != '_');
-		filled_kb_text[e_loc[0]] = 'e';
-		for (int j = 0; j < aoitn_str.length(); j++) {
-			do { random_shuffle(aoitn_loc, aoitn_loc + 8); } while (filled_kb_text[aoitn_loc[0]] != '_');
-			filled_kb_text[aoitn_loc[0]] = aoitn_str[j];
-		}
-		do { random_shuffle(x_loc, x_loc + 10); } while (filled_kb_text[x_loc[0]] != '_');
-		filled_kb_text[x_loc[0]] = 'x';
-		do { random_shuffle(h_loc, h_loc + 12); } while (filled_kb_text[h_loc[0]] != '_');
-		filled_kb_text[h_loc[0]] = 'h';
-		do { random_shuffle(r_loc, r_loc + 12); } while (filled_kb_text[r_loc[0]] != '_');
-		filled_kb_text[r_loc[0]] = 'r';
-		do { random_shuffle(l_loc, l_loc + 12); } while (filled_kb_text[l_loc[0]] != '_');
-		filled_kb_text[l_loc[0]] = 'l';
-		do { random_shuffle(y_loc, y_loc + 12); } while (filled_kb_text[y_loc[0]] != '_');
-		filled_kb_text[y_loc[0]] = 'y';
-		do { random_shuffle(u_loc, u_loc + 12); } while (filled_kb_text[u_loc[0]] != '_');
-		filled_kb_text[u_loc[0]] = 'u';
-		do { random_shuffle(m_loc, m_loc + 12); } while (filled_kb_text[m_loc[0]] != '_');
-		filled_kb_text[m_loc[0]] = 'm';
+	std::sort(effort_data.begin(), effort_data.end());
+	std::sort(hand_diff_data.begin(), hand_diff_data.end());
+	std::sort(sfb_data.begin(), sfb_data.end());
+	std::sort(lsb_data.begin(), lsb_data.end());
+	std::sort(total_twists_data.begin(), total_twists_data.end());
+	std::sort(outtwist_ratio_data.begin(), outtwist_ratio_data.end());
+	std::sort(alternate_data.begin(), alternate_data.end());
+	std::sort(total_rolls_data.begin(), total_rolls_data.end());
+	std::sort(inroll_ratio_data.begin(), inroll_ratio_data.end());
+	std::sort(onehand_data.begin(), onehand_data.end());
+	std::sort(redirect_data.begin(), redirect_data.end());
 
-		// Substitute remaining keys
-		short remaining_counter = 0;
-		random_shuffle(remaining_str.begin(), remaining_str.end());
-		for (int j = 0; j < 30; j++) {
-			if (filled_kb_text[j] == '_') {
-				filled_kb_text[j] = remaining_str[remaining_counter];
-				remaining_counter++;
-			}
-		}
-
-		// Get Keyboard stats
-		Keyboard keyboard;
-		keyboard.make_keyboard(filled_kb_text);
-		keyboard.get_stats();
-
-		// Add stats to the arrays if (is_get_stats)
-		if (is_get_stats) {
-			add_to_arrays(effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-				alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, keyboard, i);
-		}
-		// Write stats requires the output file, has to fulfill all thresholds
-		else {
-			if (fullfilled_all_thres(keyboard, thresholds)) { write_to_file(kb_file, filled_kb_text, keyboard); }
-		}
+	// Set thresholds: get best <cutoffScore>%
+	// 1 - <score> means the more the better (inverse)
+	thresholds[0] = effort_data[(int)(stats_iterations * (double)CutoffScore["effort"])];
+	thresholds[1] = hand_diff_data[(int)(stats_iterations * (double)CutoffScore["hand_diff"])];
+	thresholds[2] = sfb_data[(int)(stats_iterations * (double)CutoffScore["sfb"])];
+	thresholds[3] = lsb_data[(int)(stats_iterations * (double)CutoffScore["lsb"])];
+	thresholds[4] = total_twists_data[(int)(stats_iterations * (double)CutoffScore["total_twists"])];
+	thresholds[5] = outtwist_ratio_data[(int)(stats_iterations * (double)CutoffScore["outtwist_ratio"])];
+	thresholds[6] = alternate_data[(int)(stats_iterations * (1.0 - (double)CutoffScore["alternate"]))];
+	thresholds[7] = total_rolls_data[(int)(stats_iterations * (1.0 - (double)CutoffScore["total_rolls"]))];
+	thresholds[8] = inroll_ratio_data[(int)(stats_iterations * (1.0 - (double)CutoffScore["inroll_ratio"]))];
+	thresholds[9] = onehand_data[(int)(stats_iterations * (1.0 - (double)CutoffScore["onehand"]))];
+	thresholds[10] = redirect_data[(int)(stats_iterations * (double)CutoffScore["redirect"])];
+	for (int i = 0; i < 11; i++) {
+		cout << thresholds[i] << endl;
 	}
+
+	// get the number of iterations -> use thresholds to filter out the results
+	func(iterations, effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
+		alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, false, write_file, thresholds);
 }
-
-void gen4(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
-	vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
-	vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
-	vector<double>& onehand_data, vector<double>& redirect_data,
-	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds) {
-	string remaining_str = "bcdfgjkpqsvwz----";
-	string keyboard_str = "______________________________";
-	short e_loc[3] = { 16, 17, 18 };
-	short o_loc[3] = { 11, 12, 17 };
-	short i_loc[4] = { 16, 17, 18, 19 };
-	short n_loc[4] = { 10, 12, 13, 17 };
-	short a_loc[5] = { 11, 16, 17, 18, 19 };
-	short t_loc[5] = { 10, 11, 12, 13, 19 };
-	short h_loc[9] = { 2, 3, 9, 12, 13, 19, 22, 23, 29 };
-	short x_loc[10] = { 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 };
-	short l_loc[12] = { 0, 2, 3, 4, 10, 12, 13, 14, 20, 22, 23, 24 };
-	short m_loc[12] = { 0, 1, 3, 4, 10, 11, 13, 14, 20, 21, 23, 24 };
-	short r_loc[12] = { 0, 1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23 };
-	short u_loc[12] = { 5, 7, 8, 9, 15, 17, 18, 19, 25, 27, 28, 29 };
-	short y_loc[12] = { 5, 6, 7, 8, 15, 16, 17, 18, 25, 26, 27, 28 };
-
-
-	// Set random seed to time
-	srand(time(0));
-	for (int i = 0; i < iterations; i++) {
-		string filled_kb_text = keyboard_str;
-
-		do { random_shuffle(e_loc, e_loc + 3); } while (filled_kb_text[e_loc[0]] != '_');
-		filled_kb_text[e_loc[0]] = 'e';
-		do { random_shuffle(o_loc, o_loc + 3); } while (filled_kb_text[o_loc[0]] != '_');
-		filled_kb_text[o_loc[0]] = 'o';
-		do { random_shuffle(i_loc, i_loc + 4); } while (filled_kb_text[i_loc[0]] != '_');
-		filled_kb_text[i_loc[0]] = 'i';
-		do { random_shuffle(n_loc, n_loc + 4); } while (filled_kb_text[n_loc[0]] != '_');
-		filled_kb_text[n_loc[0]] = 'n';
-		do { random_shuffle(a_loc, a_loc + 5); } while (filled_kb_text[a_loc[0]] != '_');
-		filled_kb_text[a_loc[0]] = 'a';
-		do { random_shuffle(t_loc, t_loc + 5); } while (filled_kb_text[t_loc[0]] != '_');
-		filled_kb_text[t_loc[0]] = 't';
-		do { random_shuffle(h_loc, h_loc + 9); } while (filled_kb_text[h_loc[0]] != '_');
-		filled_kb_text[h_loc[0]] = 'h';
-		do { random_shuffle(x_loc, x_loc + 10); } while (filled_kb_text[x_loc[0]] != '_');
-		filled_kb_text[x_loc[0]] = 'x';
-		do { random_shuffle(l_loc, l_loc + 12); } while (filled_kb_text[l_loc[0]] != '_');
-		filled_kb_text[l_loc[0]] = 'l';
-		do { random_shuffle(m_loc, m_loc + 12); } while (filled_kb_text[m_loc[0]] != '_');
-		filled_kb_text[m_loc[0]] = 'm';
-		do { random_shuffle(r_loc, r_loc + 12); } while (filled_kb_text[r_loc[0]] != '_');
-		filled_kb_text[r_loc[0]] = 'r';
-		do { random_shuffle(u_loc, u_loc + 12); } while (filled_kb_text[u_loc[0]] != '_');
-		filled_kb_text[u_loc[0]] = 'u';
-		do { random_shuffle(y_loc, y_loc + 12); } while (filled_kb_text[y_loc[0]] != '_');
-		filled_kb_text[y_loc[0]] = 'y';
-
-		// Substitute remaining keys
-		short remaining_counter = 0;
-		random_shuffle(remaining_str.begin(), remaining_str.end());
-		for (int j = 0; j < 30; j++) {
-			if (filled_kb_text[j] == '_') {
-				filled_kb_text[j] = remaining_str[remaining_counter];
-				remaining_counter++;
-			}
-		}
-
-		// Get Keyboard stats
-		Keyboard keyboard;
-		keyboard.make_keyboard(filled_kb_text);
-		keyboard.get_stats();
-
-		// Add stats to the arrays if (is_get_stats)
-		if (is_get_stats) {
-			add_to_arrays(effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-				alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, keyboard, i);
-		}
-		// Write stats requires the output file, has to fulfill all thresholds
-		else {
-			if (fullfilled_all_thres(keyboard, thresholds)) { write_to_file(kb_file, filled_kb_text, keyboard); }
-		}
-	}
-}
-
-void gen5(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
-	vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
-	vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
-	vector<double>& onehand_data, vector<double>& redirect_data,
-	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds) {
-	string remaining_str = "bcdfgjkpqwz----";
-	string keyboard_str = "______________________________";
-	short a_loc[3] = { 16, 17, 18 };
-	short e_loc[3] = { 16, 17, 18 };
-	short n_loc[3] = { 10, 12, 13 };
-	short i_loc[4] = { 16, 17, 18, 19 };
-	short t_loc[4] = { 10, 11, 12, 13 };
-	short h_loc[6] = { 3, 9, 13, 19, 23, 29 };
-	short x_loc[10] = { 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 };
-	short o_loc[12] = { 2, 3, 7, 8, 10, 11, 12, 13, 16, 17, 18, 19 };
-	short l_loc[12] = { 0, 2, 3, 4, 10, 12, 13, 14, 20, 22, 23, 24 };
-	short m_loc[12] = { 0, 1, 3, 4, 10, 11, 13, 14, 20, 21, 23, 24 };
-	short r_loc[12] = { 0, 1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23 };
-	short u_loc[12] = { 5, 7, 8, 9, 15, 17, 18, 19, 25, 27, 28, 29 };
-	short y_loc[12] = { 5, 6, 7, 8, 15, 16, 17, 18, 25, 26, 27, 28 };
-	short s_loc[15] = { 0, 1, 2, 3, 6, 10, 11, 12, 13, 16, 20, 21, 22, 23, 26 };
-	short v_loc[15] = { 0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24 };
-
-
-	// Set random seed to time
-	srand(time(0));
-	for (int i = 0; i < iterations; i++) {
-		string filled_kb_text = keyboard_str;
-
-		do { random_shuffle(a_loc, a_loc + 3); } while (filled_kb_text[a_loc[0]] != '_');
-		filled_kb_text[a_loc[0]] = 'a';
-		do { random_shuffle(e_loc, e_loc + 3); } while (filled_kb_text[e_loc[0]] != '_');
-		filled_kb_text[e_loc[0]] = 'e';
-		do { random_shuffle(n_loc, n_loc + 3); } while (filled_kb_text[n_loc[0]] != '_');
-		filled_kb_text[n_loc[0]] = 'n';
-		do { random_shuffle(i_loc, i_loc + 4); } while (filled_kb_text[i_loc[0]] != '_');
-		filled_kb_text[i_loc[0]] = 'i';
-		do { random_shuffle(t_loc, t_loc + 4); } while (filled_kb_text[t_loc[0]] != '_');
-		filled_kb_text[t_loc[0]] = 't';
-		do { random_shuffle(h_loc, h_loc + 6); } while (filled_kb_text[h_loc[0]] != '_');
-		filled_kb_text[h_loc[0]] = 'h';
-		do { random_shuffle(x_loc, x_loc + 10); } while (filled_kb_text[x_loc[0]] != '_');
-		filled_kb_text[x_loc[0]] = 'x';
-		do { random_shuffle(o_loc, o_loc + 12); } while (filled_kb_text[o_loc[0]] != '_');
-		filled_kb_text[o_loc[0]] = 'o';
-		do { random_shuffle(l_loc, l_loc + 12); } while (filled_kb_text[l_loc[0]] != '_');
-		filled_kb_text[l_loc[0]] = 'l';
-		do { random_shuffle(m_loc, m_loc + 12); } while (filled_kb_text[m_loc[0]] != '_');
-		filled_kb_text[m_loc[0]] = 'm';
-		do { random_shuffle(r_loc, r_loc + 12); } while (filled_kb_text[r_loc[0]] != '_');
-		filled_kb_text[r_loc[0]] = 'r';
-		do { random_shuffle(u_loc, u_loc + 12); } while (filled_kb_text[u_loc[0]] != '_');
-		filled_kb_text[u_loc[0]] = 'u';
-		do { random_shuffle(y_loc, y_loc + 12); } while (filled_kb_text[y_loc[0]] != '_');
-		filled_kb_text[y_loc[0]] = 'y';
-		do { random_shuffle(s_loc, s_loc + 15); } while (filled_kb_text[s_loc[0]] != '_');
-		filled_kb_text[s_loc[0]] = 's';
-		do { random_shuffle(v_loc, v_loc + 15); } while (filled_kb_text[v_loc[0]] != '_');
-		filled_kb_text[v_loc[0]] = 'v';
-
-		// Substitute remaining keys
-		short remaining_counter = 0;
-		random_shuffle(remaining_str.begin(), remaining_str.end());
-		for (int j = 0; j < 30; j++) {
-			if (filled_kb_text[j] == '_') {
-				filled_kb_text[j] = remaining_str[remaining_counter];
-				remaining_counter++;
-			}
-		}
-
-		// Get Keyboard stats
-		Keyboard keyboard;
-		keyboard.make_keyboard(filled_kb_text);
-		keyboard.get_stats();
-
-		// Add stats to the arrays if (is_get_stats)
-		if (is_get_stats) {
-			add_to_arrays(effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-				alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, keyboard, i);
-		}
-		// Write stats requires the output file, has to fulfill all thresholds
-		else {
-			if (fullfilled_all_thres(keyboard, thresholds)) { write_to_file(kb_file, filled_kb_text, keyboard); }
-		}
-	}
-}
-
-void gen6(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
-	vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
-	vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
-	vector<double>& onehand_data, vector<double>& redirect_data,
-	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds) {
-	string remaining_str = "bcdfgjkpqwz----";
-	string keyboard_str = "______________________________";
-	
-	short o_loc[2] = { 7, 8 };
-	short t_loc[3] = { 11, 12, 13 };
-	short a_loc[3] = { 16, 17, 18 };
-	short e_loc[3] = { 16, 17, 18 };
-	short n_loc[3] = { 10, 12, 13 };
-	short i_loc[4] = { 16, 17, 18, 19 };
-	short s_loc[4] = { 10, 11, 12, 13 };
-	short x_loc[10] = { 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 };
-	short h_loc[13] = { 0, 1, 2, 3, 10, 11, 12, 13, 19, 20, 21, 22, 23 };
-	short l_loc[12] = { 0, 2, 3, 4, 10, 12, 13, 14, 20, 22, 23, 24 };
-	short m_loc[12] = { 0, 1, 3, 4, 10, 11, 13, 14, 20, 21, 23, 24 };
-	short r_loc[12] = { 0, 1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23 };
-	short u_loc[12] = { 5, 7, 8, 9, 15, 17, 18, 19, 25, 27, 28, 29 };
-	short y_loc[12] = { 5, 6, 7, 8, 15, 16, 17, 18, 25, 26, 27, 28 };
-	short v_loc[15] = { 0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24 };
-
-
-	// Set random seed to time
-	srand(time(0));
-	for (int i = 0; i < iterations; i++) {
-		string filled_kb_text = keyboard_str;
-
-		do { random_shuffle(o_loc, o_loc + 2); } while (filled_kb_text[o_loc[0]] != '_');
-		filled_kb_text[o_loc[0]] = 'o';
-		do { random_shuffle(t_loc, t_loc + 3); } while (filled_kb_text[t_loc[0]] != '_');
-		filled_kb_text[t_loc[0]] = 't';
-		do { random_shuffle(a_loc, a_loc + 3); } while (filled_kb_text[a_loc[0]] != '_');
-		filled_kb_text[a_loc[0]] = 'a';
-		do { random_shuffle(e_loc, e_loc + 3); } while (filled_kb_text[e_loc[0]] != '_');
-		filled_kb_text[e_loc[0]] = 'e';
-		do { random_shuffle(n_loc, n_loc + 3); } while (filled_kb_text[n_loc[0]] != '_');
-		filled_kb_text[n_loc[0]] = 'n';
-		do { random_shuffle(i_loc, i_loc + 4); } while (filled_kb_text[i_loc[0]] != '_');
-		filled_kb_text[i_loc[0]] = 'i';
-		do { random_shuffle(s_loc, s_loc + 4); } while (filled_kb_text[s_loc[0]] != '_');
-		filled_kb_text[s_loc[0]] = 's';
-		do { random_shuffle(x_loc, x_loc + 10); } while (filled_kb_text[x_loc[0]] != '_');
-		filled_kb_text[x_loc[0]] = 'x';
-		do { random_shuffle(h_loc, h_loc + 13); } while (filled_kb_text[h_loc[0]] != '_');
-		filled_kb_text[h_loc[0]] = 'h';
-		do { random_shuffle(l_loc, l_loc + 12); } while (filled_kb_text[l_loc[0]] != '_');
-		filled_kb_text[l_loc[0]] = 'l';
-		do { random_shuffle(m_loc, m_loc + 12); } while (filled_kb_text[m_loc[0]] != '_');
-		filled_kb_text[m_loc[0]] = 'm';
-		do { random_shuffle(r_loc, r_loc + 12); } while (filled_kb_text[r_loc[0]] != '_');
-		filled_kb_text[r_loc[0]] = 'r';
-		do { random_shuffle(u_loc, u_loc + 12); } while (filled_kb_text[u_loc[0]] != '_');
-		filled_kb_text[u_loc[0]] = 'u';
-		do { random_shuffle(y_loc, y_loc + 12); } while (filled_kb_text[y_loc[0]] != '_');
-		filled_kb_text[y_loc[0]] = 'y';
-		do { random_shuffle(v_loc, v_loc + 15); } while (filled_kb_text[v_loc[0]] != '_');
-		filled_kb_text[v_loc[0]] = 'v';
-
-
-		// Substitute remaining keys
-		short remaining_counter = 0;
-		random_shuffle(remaining_str.begin(), remaining_str.end());
-		for (int j = 0; j < 30; j++) {
-			if (filled_kb_text[j] == '_') {
-				filled_kb_text[j] = remaining_str[remaining_counter];
-				remaining_counter++;
-			}
-		}
-
-		// Get Keyboard stats
-		Keyboard keyboard;
-		keyboard.make_keyboard(filled_kb_text);
-		keyboard.get_stats();
-
-		// Add stats to the arrays if (is_get_stats)
-		if (is_get_stats) {
-			add_to_arrays(effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-				alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, keyboard, i);
-		}
-		// Write stats requires the output file, has to fulfill all thresholds
-		else {
-			if (fullfilled_all_thres(keyboard, thresholds)) { write_to_file(kb_file, filled_kb_text, keyboard); }
-		}
-	}
-}
-
-void gen7(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
-	vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
-	vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
-	vector<double>& onehand_data, vector<double>& redirect_data,
-	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds) {
-	string remaining_str = "bdfgjkpqwz----";
-	string keyboard_str = "___________________h__________";
-
-	short a_loc[2] = { 17, 18 };
-	short e_loc[2] = { 17, 18 };
-	short o_loc[2] = { 7, 8 };
-	short t_loc[3] = { 11, 12, 13 };
-	short i_loc[3] = { 16, 17, 18 };
-	short n_loc[4] = { 10, 11, 12, 13 };
-	short s_loc[4] = { 10, 11, 12, 13 };
-	short x_loc[10] = { 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 };
-	short l_loc[12] = { 0, 2, 3, 4, 10, 12, 13, 14, 20, 22, 23, 24 };
-	short m_loc[12] = { 0, 1, 3, 4, 10, 11, 13, 14, 20, 21, 23, 24 };
-	short r_loc[12] = { 0, 1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23 };
-	short u_loc[12] = { 5, 6, 7, 8, 15, 16, 17, 18, 25, 26, 27, 28 };
-	short y_loc[12] = { 5, 6, 7, 8, 15, 16, 17, 18, 25, 26, 27, 28 };
-	short c_loc[15] = { 0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24 };
-	short v_loc[15] = { 0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24 };
-
-
-	// Set random seed to time
-	srand(time(0));
-	for (int i = 0; i < iterations; i++) {
-		string filled_kb_text = keyboard_str;
-
-		do { random_shuffle(a_loc, a_loc + 2); } while (filled_kb_text[a_loc[0]] != '_');
-		filled_kb_text[a_loc[0]] = 'a';
-		do { random_shuffle(e_loc, e_loc + 2); } while (filled_kb_text[e_loc[0]] != '_');
-		filled_kb_text[e_loc[0]] = 'e';
-		do { random_shuffle(o_loc, o_loc + 2); } while (filled_kb_text[o_loc[0]] != '_');
-		filled_kb_text[o_loc[0]] = 'o';
-		do { random_shuffle(i_loc, i_loc + 3); } while (filled_kb_text[i_loc[0]] != '_');
-		filled_kb_text[i_loc[0]] = 'i';
-		do { random_shuffle(t_loc, t_loc + 3); } while (filled_kb_text[t_loc[0]] != '_');
-		filled_kb_text[t_loc[0]] = 't';
-		do { random_shuffle(n_loc, n_loc + 4); } while (filled_kb_text[n_loc[0]] != '_');
-		filled_kb_text[n_loc[0]] = 'n';
-		do { random_shuffle(s_loc, s_loc + 4); } while (filled_kb_text[s_loc[0]] != '_');
-		filled_kb_text[s_loc[0]] = 's';
-		do { random_shuffle(x_loc, x_loc + 10); } while (filled_kb_text[x_loc[0]] != '_');
-		filled_kb_text[x_loc[0]] = 'x';
-		do { random_shuffle(l_loc, l_loc + 12); } while (filled_kb_text[l_loc[0]] != '_');
-		filled_kb_text[l_loc[0]] = 'l';
-		do { random_shuffle(m_loc, m_loc + 12); } while (filled_kb_text[m_loc[0]] != '_');
-		filled_kb_text[m_loc[0]] = 'm';
-		do { random_shuffle(r_loc, r_loc + 12); } while (filled_kb_text[r_loc[0]] != '_');
-		filled_kb_text[r_loc[0]] = 'r';
-		do { random_shuffle(u_loc, u_loc + 12); } while (filled_kb_text[u_loc[0]] != '_');
-		filled_kb_text[u_loc[0]] = 'u';
-		do { random_shuffle(y_loc, y_loc + 12); } while (filled_kb_text[y_loc[0]] != '_');
-		filled_kb_text[y_loc[0]] = 'y';
-		do { random_shuffle(c_loc, c_loc + 15); } while (filled_kb_text[c_loc[0]] != '_');
-		filled_kb_text[c_loc[0]] = 'c';
-		do { random_shuffle(v_loc, v_loc + 15); } while (filled_kb_text[v_loc[0]] != '_');
-		filled_kb_text[v_loc[0]] = 'v';
-
-
-		// Substitute remaining keys
-		short remaining_counter = 0;
-		random_shuffle(remaining_str.begin(), remaining_str.end());
-		for (int j = 0; j < 30; j++) {
-			if (filled_kb_text[j] == '_') {
-				filled_kb_text[j] = remaining_str[remaining_counter];
-				remaining_counter++;
-			}
-		}
-
-		// Get Keyboard stats
-		Keyboard keyboard;
-		keyboard.make_keyboard(filled_kb_text);
-		keyboard.get_stats();
-
-		// Add stats to the arrays if (is_get_stats)
-		if (is_get_stats) {
-			add_to_arrays(effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-				alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, keyboard, i);
-		}
-		// Write stats requires the output file, has to fulfill all thresholds
-		else {
-			if (fullfilled_all_thres(keyboard, thresholds)) { write_to_file(kb_file, filled_kb_text, keyboard); }
-		}
-	}
-}
-
-void gen8(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
-	vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
-	vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
-	vector<double>& onehand_data, vector<double>& redirect_data,
-	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds) {
-	string remaining_str = "bfgjkpqwz----";
-	string keyboard_str = "________________iaeh__________";
-
-	short o_loc[2] = { 7, 8 };
-	short n_loc[3] = { 10, 11, 12 };
-	short t_loc[3] = { 11, 12, 13 };
-	short r_loc[4] = { 10, 11, 12, 13 };
-	short s_loc[4] = { 10, 11, 12, 13 };
-	short u_loc[4] = { 5, 6, 7, 8 };
-	short y_loc[5] = { 5, 6, 15, 25, 26 };
-	short x_loc[10] = { 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 };
-	short l_loc[12] = { 0, 2, 3, 4, 10, 12, 13, 14, 20, 22, 23, 24 };
-	short m_loc[12] = { 0, 1, 3, 4, 10, 11, 13, 14, 20, 21, 23, 24 };
-	short d_loc[15] = { 1, 2, 3, 4, 9, 11, 12, 13, 14, 21, 22, 23, 24, 29 };
-	short v_loc[15] = { 0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24 };
-	short c_loc[15] = { 0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24 };
-
-
-	// Set random seed to time
-	srand(time(0));
-	for (int i = 0; i < iterations; i++) {
-		string filled_kb_text = keyboard_str;
-
-		do { random_shuffle(o_loc, o_loc + 2); } while (filled_kb_text[o_loc[0]] != '_');
-		filled_kb_text[o_loc[0]] = 'o';
-		do { random_shuffle(n_loc, n_loc + 3); } while (filled_kb_text[n_loc[0]] != '_');
-		filled_kb_text[n_loc[0]] = 'n';
-		do { random_shuffle(t_loc, t_loc + 3); } while (filled_kb_text[t_loc[0]] != '_');
-		filled_kb_text[t_loc[0]] = 't';
-		do { random_shuffle(r_loc, r_loc + 4); } while (filled_kb_text[r_loc[0]] != '_');
-		filled_kb_text[r_loc[0]] = 'r';
-		do { random_shuffle(s_loc, s_loc + 4); } while (filled_kb_text[s_loc[0]] != '_');
-		filled_kb_text[s_loc[0]] = 's';
-		do { random_shuffle(u_loc, u_loc + 4); } while (filled_kb_text[u_loc[0]] != '_');
-		filled_kb_text[u_loc[0]] = 'u';
-		do { random_shuffle(y_loc, y_loc + 5); } while (filled_kb_text[y_loc[0]] != '_');
-		filled_kb_text[y_loc[0]] = 'y';
-		do { random_shuffle(x_loc, x_loc + 10); } while (filled_kb_text[x_loc[0]] != '_');
-		filled_kb_text[x_loc[0]] = 'x';
-		do { random_shuffle(l_loc, l_loc + 12); } while (filled_kb_text[l_loc[0]] != '_');
-		filled_kb_text[l_loc[0]] = 'l';
-		do { random_shuffle(m_loc, m_loc + 12); } while (filled_kb_text[m_loc[0]] != '_');
-		filled_kb_text[m_loc[0]] = 'm';
-		do { random_shuffle(d_loc, d_loc + 15); } while (filled_kb_text[d_loc[0]] != '_');
-		filled_kb_text[d_loc[0]] = 'd';
-		do { random_shuffle(v_loc, v_loc + 15); } while (filled_kb_text[v_loc[0]] != '_');
-		filled_kb_text[v_loc[0]] = 'v';
-		do { random_shuffle(c_loc, c_loc + 15); } while (filled_kb_text[c_loc[0]] != '_');
-		filled_kb_text[c_loc[0]] = 'c';
-
-
-		// Substitute remaining keys
-		short remaining_counter = 0;
-		random_shuffle(remaining_str.begin(), remaining_str.end());
-		for (int j = 0; j < 30; j++) {
-			if (filled_kb_text[j] == '_') {
-				filled_kb_text[j] = remaining_str[remaining_counter];
-				remaining_counter++;
-			}
-		}
-
-		// Get Keyboard stats
-		Keyboard keyboard;
-		keyboard.make_keyboard(filled_kb_text);
-		keyboard.get_stats();
-
-		// Add stats to the arrays if (is_get_stats)
-		if (is_get_stats) {
-			add_to_arrays(effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-				alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, keyboard, i);
-		}
-		// Write stats requires the output file, has to fulfill all thresholds
-		else {
-			if (fullfilled_all_thres(keyboard, thresholds)) { write_to_file(kb_file, filled_kb_text, keyboard); }
-		}
-	}
-}
-
-void gen9(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
-	vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
-	vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
-	vector<double>& onehand_data, vector<double>& redirect_data,
-	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds) {
-	string remaining_str = "bfgjkpqz----";
-	string keyboard_str = "_______o________iaeh__________";
-
-	short u_loc[2] = { 6, 8 };
-	short y_loc[2] = { 25, 26 };
-	short n_loc[3] = { 10, 11, 12 };
-	short t_loc[3] = { 11, 12, 13 };
-	short r_loc[4] = { 10, 11, 12, 13 };
-	short s_loc[4] = { 10, 11, 12, 13 };
-	short x_loc[10] = { 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 };
-	short l_loc[12] = { 0, 2, 3, 4, 10, 12, 13, 14, 20, 22, 23, 24 };
-	short m_loc[12] = { 0, 1, 3, 4, 10, 11, 13, 14, 20, 21, 23, 24 };
-	short d_loc[14] = { 1, 2, 3, 4, 9, 11, 12, 13, 14, 21, 22, 23, 24, 29 };
-	string cwv_str = "cwv";
-	short cwv_loc[15] = { 0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24 };
-
-
-	// Set random seed to time
-	srand(time(0));
-	for (int i = 0; i < iterations; i++) {
-		string filled_kb_text = keyboard_str;
-
-		do { random_shuffle(u_loc, u_loc + 2); } while (filled_kb_text[u_loc[0]] != '_');
-		filled_kb_text[u_loc[0]] = 'u';
-		do { random_shuffle(y_loc, y_loc + 2); } while (filled_kb_text[y_loc[0]] != '_');
-		filled_kb_text[y_loc[0]] = 'y';
-		do { random_shuffle(n_loc, n_loc + 3); } while (filled_kb_text[n_loc[0]] != '_');
-		filled_kb_text[n_loc[0]] = 'n';
-		do { random_shuffle(t_loc, t_loc + 3); } while (filled_kb_text[t_loc[0]] != '_');
-		filled_kb_text[t_loc[0]] = 't';
-		do { random_shuffle(r_loc, r_loc + 4); } while (filled_kb_text[r_loc[0]] != '_');
-		filled_kb_text[r_loc[0]] = 'r';
-		do { random_shuffle(s_loc, s_loc + 4); } while (filled_kb_text[s_loc[0]] != '_');
-		filled_kb_text[s_loc[0]] = 's';
-		do { random_shuffle(x_loc, x_loc + 10); } while (filled_kb_text[x_loc[0]] != '_');
-		filled_kb_text[x_loc[0]] = 'x';
-		do { random_shuffle(l_loc, l_loc + 12); } while (filled_kb_text[l_loc[0]] != '_');
-		filled_kb_text[l_loc[0]] = 'l';
-		do { random_shuffle(m_loc, m_loc + 12); } while (filled_kb_text[m_loc[0]] != '_');
-		filled_kb_text[m_loc[0]] = 'm';
-		do { random_shuffle(d_loc, d_loc + 14); } while (filled_kb_text[d_loc[0]] != '_');
-		filled_kb_text[d_loc[0]] = 'd';
-		for (int j = 0; j < cwv_str.length(); j++) {
-			do { random_shuffle(cwv_loc, cwv_loc + 15); } while (filled_kb_text[cwv_loc[0]] != '_');
-			filled_kb_text[cwv_loc[0]] = cwv_str[j];
-		}
-
-
-		// Substitute remaining keys
-		short remaining_counter = 0;
-		random_shuffle(remaining_str.begin(), remaining_str.end());
-		for (int j = 0; j < 30; j++) {
-			if (filled_kb_text[j] == '_') {
-				filled_kb_text[j] = remaining_str[remaining_counter];
-				remaining_counter++;
-			}
-		}
-
-		// Get Keyboard stats
-		Keyboard keyboard;
-		keyboard.make_keyboard(filled_kb_text);
-		keyboard.get_stats();
-
-		// Add stats to the arrays if (is_get_stats)
-		if (is_get_stats) {
-			add_to_arrays(effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-				alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, keyboard, i);
-		}
-		// Write stats requires the output file, has to fulfill all thresholds
-		else {
-			if (fullfilled_all_thres(keyboard, thresholds)) { write_to_file(kb_file, filled_kb_text, keyboard); }
-		}
-	}
-}
-
-void gen10(int& iterations, vector<double>& effort_data, vector<double>& hand_diff_data, vector<double>& sfb_data,
-	vector<double>& lsb_data, vector<double>& total_twists_data, vector<double>& outtwist_ratio_data,
-	vector<double>& alternate_data, vector<double>& total_rolls_data, vector<double>& inroll_ratio_data,
-	vector<double>& onehand_data, vector<double>& redirect_data,
-	bool is_get_stats, ofstream& kb_file, vector<double>& thresholds) {
-	string remaining_str = "bjkwvxz----";
-	string keyboard_str = "_lcm__qoupnrstg_iaeh__fd__y___";
-
-	// Set random seed to time
-	srand(time(0));
-	for (int i = 0; i < iterations; i++) {
-		string filled_kb_text = keyboard_str;
-
-		// Substitute remaining keys
-		short remaining_counter = 0;
-		random_shuffle(remaining_str.begin(), remaining_str.end());
-		for (int j = 0; j < 30; j++) {
-			if (filled_kb_text[j] == '_') {
-				filled_kb_text[j] = remaining_str[remaining_counter];
-				remaining_counter++;
-			}
-		}
-
-		// Get Keyboard stats
-		Keyboard keyboard;
-		keyboard.make_keyboard(filled_kb_text);
-		keyboard.get_stats();
-
-		// Add stats to the arrays if (is_get_stats)
-		if (is_get_stats) {
-			add_to_arrays(effort_data, hand_diff_data, sfb_data, lsb_data, total_twists_data, outtwist_ratio_data,
-				alternate_data, total_rolls_data, inroll_ratio_data, onehand_data, redirect_data, keyboard, i);
-		}
-		// Write stats requires the output file, has to fulfill all thresholds
-		else {
-			if (fullfilled_all_thres(keyboard, thresholds)) { write_to_file(kb_file, filled_kb_text, keyboard); }
-		}
-	}
-}
-
 
 int main(void) {
-	typedef chrono::high_resolution_clock Time;
-	typedef chrono::milliseconds ms;
-	typedef chrono::duration<float> fsec;
+	cout << "Generation: " << Constraints["generation"] << endl;
+	cout << "Iterations: " << Constraints["iterations"] << endl;
+	time_t preTime = time(0) + (time_t)Constraints["iterations"] / 2000;
+	int preTime_h = (preTime / 3600) % 24;
+	int preTime_m = (preTime / 60) % 60;
+	int preTime_s = preTime % 60;
+	cout << "Estimated finish time: ";
+	printf("UTC %02d:%02d:%02d\n", preTime_h, preTime_m, preTime_s);
+
 	auto startTime = Time::now();
-
-	int stats_iterations = 1'000;
-	int write_iterations = 2'000'000;
-	// Generation 1
-	// get_stats(stats_iterations, gen1, 1);
-	vector<double> thres1 = { 89.4094, 10.1845, 6.71806, 4.1403, 3.04481, 0.500164,
-							30.0939, 38.5164, 0.512739, 2.70094, 9.14206 };
-	// write_stats(write_iterations, gen1, 1, thres1);
-
-	// Generation 2
-	// get_stats(stats_iterations, gen2, 2);
-	vector<double> thres2 = { 83.2821, 7.1407, 6.27343, 3.22599, 1.02268, 0.507222,
-							32.7325, 39.3461, 0.505499, 2.86618, 9.04645 };
-	// write_stats(write_iterations, gen2, 2, thres2);
-
-	// Generation 3
-	// get_stats(stats_iterations, gen3, 3);
-	vector<double> thres3 = { 79.6144, 6.13933, 5.979, 2.53191, 0.75723, 0.458516,
-							34.2729, 39.0725, 0.513574, 2.80375, 9.44893 };
-	// write_stats(write_iterations, gen3, 3, thres3);
-
-	// Generation 4
-	// get_stats(stats_iterations, gen4, 4);
-	vector<double> thres4 = { 78.0474, 7.59425, 5.38955, 2.53191, 0.806351, 0.462645,
-							36.159, 39.3035, 0.537363, 2.68778, 7.54643 };
-	// write_stats(write_iterations, gen4, 4, thres4);
-
-	// Generation 5
-	// get_stats(stats_iterations, gen5, 5);
-	vector<double> thres5 = { 79.2437, 7.59425, 4.25382, 2.92565, 0.806351, 0.515759,
-							39.3995, 39.4583, 0.549892, 1.55073, 5.32996 };
-	// write_stats(write_iterations, gen5, 5, thres5);
-
-	// Generation 6
-	// get_stats(stats_iterations, gen6, 6);
-	vector<double> thres6 = { 77.8098, 5.70048, 3.86215, 2.68663, 0.864295, 0.484539,
-							42.3241, 39.7835, 0.570599, 1.20804, 4.18111 };
-	// write_stats(write_iterations, gen6, 6, thres6);
-
-	// Generation 7
-	// get_stats(stats_iterations, gen7, 7);
-	vector<double> thres7 = { 76.3865, 4.63001, 2.42603, 2.02903, 0.864295, 0.463861,
-							42.0869, 40.0864, 0.60725, 1.20331, 3.67339 };
-	// write_stats(write_iterations, gen7, 7, thres7);
-
-	// Generation 8
-	// get_stats(stats_iterations, gen8, 8);
-	vector<double> thres8 = { 76.3865, 4.63001, 1.80000, 2.02903, 0.864295, 0.463861,
-							42.0869, 40.0864, 0.60725, 1.20331, 3.67339 };
-	// write_stats(write_iterations, gen8, 8, thres8);
-
-	// Generation 9
-	// get_stats(stats_iterations, gen9, 9);
-	vector<double> thres9 = { 76.1465, 4.63001, 1.40000, 1.72081, 0.864295, 0.463861,
-							42.0869, 41.7296, 0.630459, 1.20331, 3.67339 };
-	// write_stats(write_iterations, gen9, 9, thres9);
-
-	// Generation 10
-	// get_stats(stats_iterations, gen10, 10);
-	vector<double> thres10 = { 76.1465, 4.63001, 1.00000, 1.72081, 0.864295, 0.463861,
-							42.0869, 41.7296, 0.630459, 1.20331, 3.67339 };
-	write_stats(write_iterations, gen10, 10, thres10);
-
+	
+	// MAIN FUNCTION
+	auto_get_stats(auto_gen);
 
 	auto endTime = Time::now();
 	fsec fs = endTime - startTime;
