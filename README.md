@@ -65,4 +65,4 @@ Stats (MT-QUOTES):
   SFS: 6.12%
   LH/RH: 48.52% | 51.48%
   
-It's uploaded to AKL discord. You can view the stats using `!amini view colevrak` to view my keyboard layout
+It's uploaded to AKL discord. You can view the stats using `!bmini view colevrak` to view my keyboard layout
